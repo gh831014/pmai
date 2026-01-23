@@ -1,0 +1,7 @@
+{
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "name": "pmlaogao",
+  "description": "产品老高 AI 工具展示界面"
+}
