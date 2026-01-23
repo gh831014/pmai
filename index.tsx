@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { User, Lock, ExternalLink, Calendar, MapPin, List, Plus, Trash, Edit, Save, X, Activity, LogOut, ShieldCheck, FileText, AlertCircle } from 'lucide-react';
+import { User, Lock, ExternalLink, Plus, Trash, Edit, Save, X, Activity, LogOut, ShieldCheck, FileText, AlertCircle, List, ChevronRight, Loader2 } from 'lucide-react';
 
 // --- Types & Constants ---
 
@@ -28,7 +28,7 @@ const INITIAL_MEMBERS_MD = `| 用户名 | 密码 | 开始时间 | 结束时间 |
 const INITIAL_LOGS_MD = `| IP | 位置 | 时间 | 次数 |
 |---|---|---|---|`;
 
-// --- Data Manager (Simulating MD File I/O) ---
+// --- Data Manager ---
 
 class DataManager {
   static getMembersMD(): string {
@@ -47,9 +47,8 @@ class DataManager {
     localStorage.setItem('pmlaogao_logs_md', content);
   }
 
-  // Parse MD table to Objects
   static parseMembers(md: string): Member[] {
-    const lines = md.trim().split('\n').slice(2); // Skip header and separator
+    const lines = md.trim().split('\n').slice(2);
     return lines.map(line => {
       const parts = line.split('|').map(s => s.trim()).filter(s => s !== '');
       if (parts.length < 4) return null;
@@ -62,7 +61,6 @@ class DataManager {
     }).filter(Boolean) as Member[];
   }
 
-  // Generate MD table from Objects
   static generateMembersMD(members: Member[]): string {
     let md = `| 用户名 | 密码 | 开始时间 | 结束时间 |\n|---|---|---|---|\n`;
     members.forEach(m => {
@@ -74,9 +72,7 @@ class DataManager {
   static appendLog(ip: string, location: string, count: number) {
     let currentMD = this.getLogsMD();
     const time = new Date().toLocaleString('zh-CN');
-    // Simple append to table
     const newRow = `| ${ip} | ${location} | ${time} | ${count} |`;
-    // Ensure we don't have trailing newlines messing up formatting
     currentMD = currentMD.trim() + '\n' + newRow;
     this.saveLogsMD(currentMD);
   }
@@ -131,15 +127,15 @@ const getLocation = (): Promise<string> => {
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col transform transition-all scale-100">
-        <div className="flex justify-between items-center p-5 border-b bg-gray-50">
-          <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={24} />
+    <div className="fixed inset-0 bg-stone-900/40 flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-all duration-300">
+      <div className="bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col transform transition-all scale-100 border border-white/50 ring-1 ring-black/5">
+        <div className="flex justify-between items-center p-6 border-b border-stone-100 bg-white/50 backdrop-blur-md sticky top-0 z-10">
+          <h3 className="text-xl font-bold text-stone-800 tracking-tight">{title}</h3>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 transition-colors p-1 rounded-full hover:bg-stone-100">
+            <X size={20} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto">
+        <div className="p-6 overflow-y-auto bg-stone-50/50">
           {children}
         </div>
       </div>
@@ -201,46 +197,46 @@ const MemberManagement = () => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-lg text-gray-700">会员名单 (Members.md)</h3>
-        <button onClick={handleAdd} className="flex items-center gap-2 bg-green-500 text-white px-3 py-1.5 rounded hover:bg-green-600 transition-colors">
+        <h3 className="font-bold text-stone-700">会员名单 (Members.md)</h3>
+        <button onClick={handleAdd} className="flex items-center gap-2 bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm">
           <Plus size={16} /> 添加会员
         </button>
       </div>
 
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="w-full text-sm text-left text-gray-500">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+      <div className="overflow-x-auto border border-stone-200 rounded-xl bg-white shadow-sm">
+        <table className="w-full text-sm text-left text-stone-600">
+          <thead className="text-xs text-stone-500 uppercase bg-stone-50 border-b border-stone-100">
             <tr>
-              <th className="px-4 py-3">用户名</th>
-              <th className="px-4 py-3">密码</th>
-              <th className="px-4 py-3">有效期开始</th>
-              <th className="px-4 py-3">有效期结束</th>
-              <th className="px-4 py-3 text-right">操作</th>
+              <th className="px-4 py-3 font-semibold">用户名</th>
+              <th className="px-4 py-3 font-semibold">密码</th>
+              <th className="px-4 py-3 font-semibold">开始时间</th>
+              <th className="px-4 py-3 font-semibold">结束时间</th>
+              <th className="px-4 py-3 text-right font-semibold">操作</th>
             </tr>
           </thead>
           <tbody>
             {members.map((m, idx) => (
-              <tr key={idx} className="bg-white border-b hover:bg-gray-50">
+              <tr key={idx} className="bg-white border-b border-stone-50 hover:bg-stone-50/50 transition-colors">
                 {isEditing === idx ? (
                   <>
-                    <td className="px-2 py-2"><input className="border rounded px-1 w-full" value={editForm.username} onChange={e => setEditForm({...editForm, username: e.target.value})} /></td>
-                    <td className="px-2 py-2"><input className="border rounded px-1 w-full" value={editForm.pass} onChange={e => setEditForm({...editForm, pass: e.target.value})} /></td>
-                    <td className="px-2 py-2"><input type="datetime-local" className="border rounded px-1 w-full" value={editForm.startDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, startDate: e.target.value.replace('T', ' ')})} /></td>
-                    <td className="px-2 py-2"><input type="datetime-local" className="border rounded px-1 w-full" value={editForm.endDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, endDate: e.target.value.replace('T', ' ')})} /></td>
+                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.username} onChange={e => setEditForm({...editForm, username: e.target.value})} /></td>
+                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.pass} onChange={e => setEditForm({...editForm, pass: e.target.value})} /></td>
+                    <td className="px-2 py-2"><input type="datetime-local" className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.startDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, startDate: e.target.value.replace('T', ' ')})} /></td>
+                    <td className="px-2 py-2"><input type="datetime-local" className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.endDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, endDate: e.target.value.replace('T', ' ')})} /></td>
                     <td className="px-2 py-2 text-right">
-                       <button onClick={handleSaveEdit} className="text-green-600 hover:text-green-900 mr-2"><Save size={18} /></button>
-                       <button onClick={() => setIsEditing(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                       <button onClick={handleSaveEdit} className="text-emerald-600 hover:text-emerald-800 p-1"><Save size={16} /></button>
+                       <button onClick={() => setIsEditing(null)} className="text-stone-400 hover:text-stone-600 p-1"><X size={16} /></button>
                     </td>
                   </>
                 ) : (
                   <>
-                    <td className="px-4 py-3 font-medium text-gray-900">{m.username}</td>
-                    <td className="px-4 py-3">{m.pass}</td>
-                    <td className="px-4 py-3">{m.startDate}</td>
-                    <td className="px-4 py-3">{m.endDate}</td>
+                    <td className="px-4 py-3 font-medium text-stone-900">{m.username}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{m.pass}</td>
+                    <td className="px-4 py-3 text-xs">{m.startDate}</td>
+                    <td className="px-4 py-3 text-xs">{m.endDate}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleEdit(idx)} className="text-blue-600 hover:text-blue-900 mr-3"><Edit size={18} /></button>
-                      <button onClick={() => handleDelete(idx)} className="text-red-600 hover:text-red-900"><Trash size={18} /></button>
+                      <button onClick={() => handleEdit(idx)} className="text-amber-600 hover:text-amber-800 mr-2 p-1"><Edit size={16} /></button>
+                      <button onClick={() => handleDelete(idx)} className="text-rose-500 hover:text-rose-700 p-1"><Trash size={16} /></button>
                     </td>
                   </>
                 )}
@@ -262,8 +258,8 @@ const LogViewer = () => {
 
   return (
     <div className="mt-8">
-       <h3 className="font-bold text-lg text-gray-700 mb-4">登录/访问日志 (Logs.md)</h3>
-       <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-auto h-64 whitespace-pre">
+       <h3 className="font-bold text-stone-700 mb-3">系统日志 (Logs.md)</h3>
+       <div className="bg-stone-900 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-auto h-48 whitespace-pre shadow-inner">
          {logs}
        </div>
     </div>
@@ -332,23 +328,17 @@ const App = () => {
   };
 
   const handleLinkClick = async (url: string) => {
-    // 1. If Member/Admin: Check Validity (already checked on login mostly, but good to be safe)
     if (user.isLoggedIn) {
-      // Members valid: Pass through
       window.open(url, '_blank');
       return;
     }
 
-    // 2. If Guest
     if (!clientInfo.ip) {
-       // Wait for IP? Or proceed with fallback.
        alert("正在获取网络信息，请稍后再试");
        return;
     }
 
     const currentCount = DataManager.incrementGuestUsage(clientInfo.ip);
-    
-    // Log Activity
     DataManager.appendLog(clientInfo.ip, clientInfo.location, currentCount);
 
     if (currentCount > 5) {
@@ -359,48 +349,63 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-stone-50 font-sans selection:bg-amber-100 selection:text-amber-900">
+      
       {/* Navigation */}
-      <nav className="bg-white shadow-md z-10 relative">
+      <nav className="fixed w-full z-40 top-0 transition-all duration-300 bg-white/80 backdrop-blur-md border-b border-stone-200/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between h-16 sm:h-20">
             <div className="flex items-center gap-3">
-              {/* Logo Placeholder */}
-              <div className="bg-blue-600 text-white p-2 rounded-full">
-                <ShieldCheck size={24} />
+              {/* Logo Area */}
+              <div className="relative group cursor-pointer overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                {/* Fallback visual if image fails or before load, though img tag is primary */}
+                <img 
+                  src="./logo.png" 
+                  alt="产品老高 PM LAOGAO" 
+                  className="h-10 sm:h-12 w-auto object-contain"
+                  onError={(e) => {
+                    // Fallback to text representation if logo.png is missing
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <div className="hidden h-10 px-3 bg-amber-400 flex items-center justify-center text-white font-bold text-lg rounded leading-none">
+                  产品老高
+                </div>
               </div>
-              <span className="font-bold text-xl text-gray-800 tracking-tight">产品老高</span>
             </div>
             
             <div className="flex items-center gap-4">
               {user.isLoggedIn ? (
-                 <div className="flex items-center gap-3">
-                   <div className="text-gray-700 flex items-center gap-2">
-                     <User size={18} />
-                     <span className="font-medium">{user.username}</span>
+                 <div className="flex items-center gap-2 sm:gap-4 bg-stone-100/50 p-1.5 rounded-full pl-4 border border-stone-200">
+                   <div className="text-stone-700 flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                     <span className="font-semibold text-sm">{user.username}</span>
                    </div>
                    {user.isAdmin && (
                      <button 
                        onClick={() => setShowAdmin(true)}
-                       className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700 flex items-center gap-2"
+                       className="text-stone-500 hover:text-amber-600 transition-colors p-1.5 rounded-full hover:bg-white"
+                       title="管理后台"
                      >
-                       <List size={16} /> 管理会员
+                       <List size={18} />
                      </button>
                    )}
                    <button 
                      onClick={handleLogout}
-                     className="text-gray-500 hover:text-red-500 transition-colors"
+                     className="bg-white text-stone-500 hover:text-rose-500 hover:bg-stone-50 transition-all p-1.5 rounded-full shadow-sm border border-stone-100"
                      title="退出登录"
                    >
-                     <LogOut size={20} />
+                     <LogOut size={16} />
                    </button>
                  </div>
               ) : (
                 <button 
                   onClick={() => setShowLogin(true)}
-                  className="bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 shadow-md transition-all hover:shadow-lg flex items-center gap-2"
+                  className="group relative inline-flex items-center justify-center px-6 py-2 text-sm font-semibold text-white transition-all duration-200 bg-stone-900 font-pj rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-900 hover:bg-stone-800 shadow-lg hover:shadow-stone-900/30"
                 >
-                  <User size={16} /> 登录
+                  <span className="mr-2">登录</span>
+                  <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform"/>
                 </button>
               )}
             </div>
@@ -409,84 +414,99 @@ const App = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-grow bg-slate-50 relative overflow-hidden">
-        {/* Decorative Background Elements */}
+      <main className="flex-grow relative pt-24 pb-12 overflow-hidden">
+        {/* Decorative Background Elements (Updated to Brand Colors) */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] left-[-5%] w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-          <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-32 left-20 w-96 h-96 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+          <div className="absolute top-[-5%] right-[-5%] w-[500px] h-[500px] bg-amber-200/40 rounded-full mix-blend-multiply filter blur-[80px] opacity-60 animate-blob"></div>
+          <div className="absolute top-[10%] left-[-10%] w-[400px] h-[400px] bg-orange-200/40 rounded-full mix-blend-multiply filter blur-[80px] opacity-60 animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-[-10%] left-[20%] w-[600px] h-[600px] bg-yellow-100/50 rounded-full mix-blend-multiply filter blur-[100px] opacity-50 animate-blob animation-delay-4000"></div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-0">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
-              欢迎光临产品老高
-              <span className="text-blue-600">AI</span>
-              学习网站
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-0">
+          <div className="text-center mb-20 mt-8 sm:mt-12">
+            <div className="inline-block mb-4 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-xs font-bold tracking-wide uppercase shadow-sm">
+              专业 · 实战 · 深度
+            </div>
+            <h1 className="text-4xl md:text-6xl font-extrabold text-stone-900 mb-6 tracking-tight leading-tight">
+              赋能您的 <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600">AI 产品</span> 学习之路
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              请选择下列内容浏览，开启您的 AI 产品学习之旅
+            <p className="text-lg md:text-xl text-stone-500 max-w-2xl mx-auto leading-relaxed">
+              汇聚实战工具与深度方法论，帮助产品经理在人工智能时代构建核心竞争力。
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
             {/* Card 1 */}
             <div 
               onClick={() => handleLinkClick('https://analysisresume.netlify.app/')}
-              className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer border border-gray-100 group"
+              className="group relative bg-white rounded-2xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.1)] transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-stone-100 overflow-hidden"
             >
-              <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors duration-300">
-                <FileText className="text-blue-600 group-hover:text-white transition-colors duration-300" size={28} />
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-amber-500 transition-colors duration-300 shadow-sm group-hover:shadow-amber-500/30">
+                <FileText className="text-amber-600 group-hover:text-white transition-colors duration-300" size={26} />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3 group-hover:text-blue-600 transition-colors">个人简历分析</h3>
-              <p className="text-gray-500 mb-4 line-clamp-2">上传简历产出分析报告，基于 AI 深度解析您的职业优势。</p>
-              <div className="flex items-center text-blue-500 font-medium text-sm">
-                立即体验 <ExternalLink size={14} className="ml-1" />
+              <h3 className="text-xl font-bold text-stone-800 mb-3 group-hover:text-amber-600 transition-colors">个人简历分析</h3>
+              <p className="text-stone-500 mb-6 leading-relaxed text-sm">上传简历产出分析报告，基于 AI 深度解析您的职业优势，优化求职竞争力。</p>
+              <div className="flex items-center text-amber-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                立即体验 <ChevronRight size={16} className="ml-1" />
               </div>
             </div>
 
             {/* Card 2 */}
             <div 
               onClick={() => handleLinkClick('https://knowledgeanalysis.netlify.app/')}
-              className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer border border-gray-100 group"
+              className="group relative bg-white rounded-2xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.1)] transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-stone-100 overflow-hidden"
             >
-               <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-purple-600 transition-colors duration-300">
-                <Activity className="text-purple-600 group-hover:text-white transition-colors duration-300" size={28} />
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+               <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-orange-500 transition-colors duration-300 shadow-sm group-hover:shadow-orange-500/30">
+                <Activity className="text-orange-600 group-hover:text-white transition-colors duration-300" size={26} />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3 group-hover:text-purple-600 transition-colors">知识点提炼工具</h3>
-              <p className="text-gray-500 mb-4 line-clamp-2">上传文件，智能提炼文章核心知识点与方法论。</p>
-              <div className="flex items-center text-purple-500 font-medium text-sm">
-                立即体验 <ExternalLink size={14} className="ml-1" />
+              <h3 className="text-xl font-bold text-stone-800 mb-3 group-hover:text-orange-600 transition-colors">知识点提炼工具</h3>
+              <p className="text-stone-500 mb-6 leading-relaxed text-sm">高效阅读助手，上传文档即可智能提炼核心知识点与方法论架构。</p>
+              <div className="flex items-center text-orange-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                立即体验 <ChevronRight size={16} className="ml-1" />
               </div>
             </div>
 
             {/* Card 3 (Coming Soon) */}
-            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200 relative overflow-hidden opacity-80 cursor-not-allowed">
-              <div className="absolute top-4 right-4 bg-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                即将上线
+            <div className="bg-stone-50 rounded-2xl p-8 border border-stone-200 relative overflow-hidden flex flex-col justify-between select-none">
+              <div>
+                <div className="w-14 h-14 bg-stone-200 rounded-2xl flex items-center justify-center mb-6">
+                  <Lock className="text-stone-400" size={26} />
+                </div>
+                <h3 className="text-xl font-bold text-stone-400 mb-3">产品AI 学习方法</h3>
+                <p className="text-stone-400 mb-4 text-sm">体系化课程正在打磨中，敬请期待...</p>
               </div>
-              <div className="w-14 h-14 bg-gray-200 rounded-xl flex items-center justify-center mb-6">
-                <Lock className="text-gray-400" size={28} />
+              <div className="mt-4">
+                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-200 text-stone-500">
+                   Coming Soon
+                 </span>
               </div>
-              <h3 className="text-xl font-bold text-gray-400 mb-3">产品AI 学习方法</h3>
-              <p className="text-gray-400 mb-4">敬请期待更多精彩内容...</p>
             </div>
           </div>
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="bg-white border-t border-stone-200 py-8 relative z-10">
+         <div className="max-w-7xl mx-auto px-4 text-center">
+            <p className="text-stone-400 text-sm">© {new Date().getFullYear()} 产品老高 PM LAOGAO. All rights reserved.</p>
+         </div>
+      </footer>
+
       {/* Login Modal */}
       <Modal isOpen={showLogin} onClose={() => setShowLogin(false)} title="用户登录">
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">账号</label>
-            <div className="relative">
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">账号</label>
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User size={18} className="text-gray-400" />
+                <User size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
               </div>
               <input 
                 type="text" 
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
                 placeholder="请输入用户名"
                 value={loginForm.username}
                 onChange={e => setLoginForm({...loginForm, username: e.target.value})}
@@ -494,14 +514,14 @@ const App = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">密码</label>
-            <div className="relative">
+            <label className="block text-sm font-semibold text-stone-700 mb-1.5">密码</label>
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock size={18} className="text-gray-400" />
+                <Lock size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
               </div>
               <input 
                 type="password" 
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
                 placeholder="请输入密码"
                 value={loginForm.pass}
                 onChange={e => setLoginForm({...loginForm, pass: e.target.value})}
@@ -510,17 +530,17 @@ const App = () => {
           </div>
           
           {loginError && (
-            <div className="text-red-500 text-sm flex items-center gap-1">
-              <AlertCircle size={14} /> {loginError}
+            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-sm p-3 rounded-lg flex items-center gap-2 animate-pulse">
+              <AlertCircle size={16} /> {loginError}
             </div>
           )}
 
           <div className="pt-2">
             <button 
               type="submit" 
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-900 transition-all transform active:scale-[0.98]"
             >
-              登录
+              立即登录
             </button>
           </div>
         </form>
@@ -530,7 +550,7 @@ const App = () => {
       <Modal isOpen={showAdmin} onClose={() => setShowAdmin(false)} title="管理员控制台">
          <div className="space-y-8">
             <MemberManagement />
-            <div className="border-t pt-6">
+            <div className="border-t border-stone-200 pt-6">
               <LogViewer />
             </div>
          </div>
@@ -539,19 +559,20 @@ const App = () => {
       {/* Block Alert Modal */}
       <Modal isOpen={blockModal} onClose={() => setBlockModal(false)} title="温馨提示">
         <div className="text-center py-6">
-          <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-             <AlertCircle size={32} className="text-red-600" />
+          <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+             <AlertCircle size={32} className="text-amber-600" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">游客访问次数已达上限</h3>
-          <p className="text-gray-500 mb-6">
-            游客限制每天访问 5 次。<br/>请联系老高充值会员，解锁无限访问权限。<br/>
-            <span className="font-bold text-gray-800 text-lg mt-2 block">9.9元 / 月</span>
+          <h3 className="text-xl font-bold text-stone-900 mb-3">游客访问次数已达上限</h3>
+          <p className="text-stone-500 mb-8 leading-relaxed">
+            游客限制每天访问 5 次。<br/>
+            为了提供更优质稳定的服务，请联系老高充值会员。<br/>
+            <span className="font-bold text-amber-600 text-2xl mt-4 block">¥ 9.9 <span className="text-sm text-stone-400 font-normal">/ 月</span></span>
           </p>
           <button 
             onClick={() => setBlockModal(false)}
-            className="w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+            className="w-full py-3 bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors font-bold shadow-lg shadow-stone-900/20"
           >
-            知道了
+            我知道了
           </button>
         </div>
       </Modal>
