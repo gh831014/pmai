@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { User, Lock, ExternalLink, Plus, Trash, Edit, Save, X, Activity, LogOut, ShieldCheck, FileText, AlertCircle, List, ChevronRight, Loader2 } from 'lucide-react';
+import { User, Lock, ExternalLink, Plus, Trash, Edit, Save, X, Activity, LogOut, ShieldCheck, FileText, AlertCircle, List, ChevronRight, Loader2, MessageCircle, ScanLine } from 'lucide-react';
 
 // --- Types & Constants ---
 
@@ -25,8 +25,9 @@ const INITIAL_MEMBERS_MD = `| 用户名 | 密码 | 开始时间 | 结束时间 |
 |---|---|---|---|
 | pmlaogao | 011348 | 2026-01-01 00:00:00 | 2999-01-01 00:00:00 |`;
 
-const INITIAL_LOGS_MD = `| IP | 位置 | 时间 | 次数 |
-|---|---|---|---|`;
+// Updated to include "User" column
+const INITIAL_LOGS_MD = `| 用户 | IP | 位置 | 时间 | 次数 |
+|---|---|---|---|---|`;
 
 // --- Data Manager ---
 
@@ -40,7 +41,12 @@ class DataManager {
   }
 
   static getLogsMD(): string {
-    return localStorage.getItem('pmlaogao_logs_md') || INITIAL_LOGS_MD;
+    const logs = localStorage.getItem('pmlaogao_logs_md');
+    // Simple check to see if we need to migrate to new format (optional, but good for safety)
+    if (logs && !logs.includes('| 用户 |')) {
+       return INITIAL_LOGS_MD + '\n' + logs.split('\n').slice(2).map(l => `| Unknown | ${l.substring(1)}`).join('\n');
+    }
+    return logs || INITIAL_LOGS_MD;
   }
 
   static saveLogsMD(content: string) {
@@ -50,11 +56,14 @@ class DataManager {
   static parseMembers(md: string): Member[] {
     const lines = md.trim().split('\n').slice(2);
     return lines.map(line => {
-      const parts = line.split('|').map(s => s.trim()).filter(s => s !== '');
+      // Robust split that preserves empty strings for password
+      const content = line.trim().replace(/^\||\|$/g, ''); 
+      const parts = content.split('|').map(s => s.trim());
+      
       if (parts.length < 4) return null;
       return {
         username: parts[0],
-        pass: parts[1],
+        pass: parts[1], // Can be empty string
         startDate: parts[2],
         endDate: parts[3]
       };
@@ -64,15 +73,16 @@ class DataManager {
   static generateMembersMD(members: Member[]): string {
     let md = `| 用户名 | 密码 | 开始时间 | 结束时间 |\n|---|---|---|---|\n`;
     members.forEach(m => {
+      // Ensure we maintain the structure even if pass is empty
       md += `| ${m.username} | ${m.pass} | ${m.startDate} | ${m.endDate} |\n`;
     });
     return md;
   }
 
-  static appendLog(ip: string, location: string, count: number) {
+  static appendLog(username: string, ip: string, location: string, count: number) {
     let currentMD = this.getLogsMD();
     const time = new Date().toLocaleString('zh-CN');
-    const newRow = `| ${ip} | ${location} | ${time} | ${count} |`;
+    const newRow = `| ${username} | ${ip} | ${location} | ${time} | ${count} |`;
     currentMD = currentMD.trim() + '\n' + newRow;
     this.saveLogsMD(currentMD);
   }
@@ -147,6 +157,14 @@ const MemberManagement = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [isEditing, setIsEditing] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Member>({ username: '', pass: '', startDate: '', endDate: '' });
+  
+  // New State for Adding Members Manually
+  const [addForm, setAddForm] = useState<Member>({ 
+    username: '', 
+    pass: '', 
+    startDate: new Date().toISOString().slice(0, 10) + ' 00:00:00', 
+    endDate: '2026-01-01 00:00:00' 
+  });
 
   useEffect(() => {
     loadMembers();
@@ -184,31 +202,34 @@ const MemberManagement = () => {
     }
   };
 
-  const handleAdd = () => {
-    const newMember: Member = {
-      username: 'user' + Math.floor(Math.random() * 1000),
-      pass: '123456',
-      startDate: new Date().toISOString().slice(0, 10) + ' 00:00:00',
-      endDate: '2026-01-01 00:00:00'
-    };
-    handleSaveMD([...members, newMember]);
+  const handleAddNewMember = () => {
+    if (!addForm.username.trim()) {
+        alert('请输入用户名');
+        return;
+    }
+    const newMembers = [...members, addForm];
+    handleSaveMD(newMembers);
+    // Reset form
+    setAddForm({ 
+        username: '', 
+        pass: '', 
+        startDate: new Date().toISOString().slice(0, 10) + ' 00:00:00', 
+        endDate: '2026-01-01 00:00:00' 
+    });
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-stone-700">会员名单 (Members.md)</h3>
-        <button onClick={handleAdd} className="flex items-center gap-2 bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm">
-          <Plus size={16} /> 添加会员
-        </button>
       </div>
 
-      <div className="overflow-x-auto border border-stone-200 rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto border border-stone-200 rounded-xl bg-white shadow-sm max-h-60">
         <table className="w-full text-sm text-left text-stone-600">
-          <thead className="text-xs text-stone-500 uppercase bg-stone-50 border-b border-stone-100">
+          <thead className="text-xs text-stone-500 uppercase bg-stone-50 border-b border-stone-100 sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 font-semibold">用户名</th>
-              <th className="px-4 py-3 font-semibold">密码</th>
+              <th className="px-4 py-3 font-semibold">用户名/微信名</th>
+              <th className="px-4 py-3 font-semibold">密码 (空=微信)</th>
               <th className="px-4 py-3 font-semibold">开始时间</th>
               <th className="px-4 py-3 font-semibold">结束时间</th>
               <th className="px-4 py-3 text-right font-semibold">操作</th>
@@ -219,8 +240,8 @@ const MemberManagement = () => {
               <tr key={idx} className="bg-white border-b border-stone-50 hover:bg-stone-50/50 transition-colors">
                 {isEditing === idx ? (
                   <>
-                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.username} onChange={e => setEditForm({...editForm, username: e.target.value})} /></td>
-                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.pass} onChange={e => setEditForm({...editForm, pass: e.target.value})} /></td>
+                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.username} onChange={e => setEditForm({...editForm, username: e.target.value})} placeholder="用户名或微信名" /></td>
+                    <td className="px-2 py-2"><input className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.pass} onChange={e => setEditForm({...editForm, pass: e.target.value})} placeholder="留空支持微信登录" /></td>
                     <td className="px-2 py-2"><input type="datetime-local" className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.startDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, startDate: e.target.value.replace('T', ' ')})} /></td>
                     <td className="px-2 py-2"><input type="datetime-local" className="border border-stone-200 rounded px-2 py-1 w-full text-xs focus:ring-2 focus:ring-amber-500 outline-none" value={editForm.endDate.replace(' ', 'T')} onChange={e => setEditForm({...editForm, endDate: e.target.value.replace('T', ' ')})} /></td>
                     <td className="px-2 py-2 text-right">
@@ -231,7 +252,9 @@ const MemberManagement = () => {
                 ) : (
                   <>
                     <td className="px-4 py-3 font-medium text-stone-900">{m.username}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{m.pass}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {m.pass ? m.pass : <span className="text-emerald-500 italic">微信用户</span>}
+                    </td>
                     <td className="px-4 py-3 text-xs">{m.startDate}</td>
                     <td className="px-4 py-3 text-xs">{m.endDate}</td>
                     <td className="px-4 py-3 text-right">
@@ -244,6 +267,59 @@ const MemberManagement = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* New Member Input Form */}
+      <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mt-4 shadow-sm">
+          <h4 className="text-sm font-bold text-stone-700 mb-3 flex items-center gap-2">
+              <Plus size={16} className="text-emerald-500" /> 添加新会员
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                  <label className="block text-xs font-semibold text-stone-500 mb-1">用户名/微信名</label>
+                  <input 
+                      className="border border-stone-200 rounded px-3 py-2 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      value={addForm.username} 
+                      onChange={e => setAddForm({...addForm, username: e.target.value})} 
+                      placeholder="请输入用户名或微信昵称" 
+                  />
+              </div>
+              <div>
+                  <label className="block text-xs font-semibold text-stone-500 mb-1">密码 (留空则为微信用户)</label>
+                  <input 
+                      className="border border-stone-200 rounded px-3 py-2 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      value={addForm.pass} 
+                      onChange={e => setAddForm({...addForm, pass: e.target.value})} 
+                      placeholder="留空即支持微信一键登录" 
+                  />
+              </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div>
+                  <label className="block text-xs font-semibold text-stone-500 mb-1">开始时间</label>
+                  <input 
+                      type="datetime-local"
+                      className="border border-stone-200 rounded px-3 py-2 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      value={addForm.startDate.replace(' ', 'T')} 
+                      onChange={e => setAddForm({...addForm, startDate: e.target.value.replace('T', ' ')})} 
+                  />
+              </div>
+              <div>
+                  <label className="block text-xs font-semibold text-stone-500 mb-1">结束时间</label>
+                  <input 
+                      type="datetime-local"
+                      className="border border-stone-200 rounded px-3 py-2 w-full text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      value={addForm.endDate.replace(' ', 'T')} 
+                      onChange={e => setAddForm({...addForm, endDate: e.target.value.replace('T', ' ')})} 
+                  />
+              </div>
+          </div>
+          <button 
+              onClick={handleAddNewMember} 
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+              <Save size={18} /> 保存添加
+          </button>
       </div>
     </div>
   );
@@ -266,12 +342,27 @@ const LogViewer = () => {
   );
 };
 
+const QRCodeGenerator = () => {
+  return (
+    <div className="bg-white w-48 h-48 mx-auto border-2 border-dashed border-stone-200 rounded-xl flex items-center justify-center relative overflow-hidden group">
+       <img src="./qrcode.png" alt="请添加管理员微信" className="w-full h-full object-cover" />
+       <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+         <span className="text-xs bg-white/90 px-2 py-1 rounded shadow text-stone-600">Scan Me</span>
+       </div>
+    </div>
+  );
+};
+
 // --- Main App Component ---
 
 const App = () => {
   const [user, setUser] = useState<UserState>({ isLoggedIn: false, username: 'Guest', isAdmin: false });
   const [showLogin, setShowLogin] = useState(false);
+  
+  // Login State
+  const [loginMode, setLoginMode] = useState<'password' | 'wechat'>('password');
   const [loginForm, setLoginForm] = useState({ username: '', pass: '' });
+  const [wechatName, setWechatName] = useState('');
   const [loginError, setLoginError] = useState('');
   
   const [showAdmin, setShowAdmin] = useState(false);
@@ -290,7 +381,17 @@ const App = () => {
     init();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Reset modal state when closed
+  useEffect(() => {
+    if (!showLogin) {
+      setLoginMode('password');
+      setLoginError('');
+      setLoginForm({ username: '', pass: '' });
+      setWechatName('');
+    }
+  }, [showLogin]);
+
+  const handlePasswordLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
@@ -306,20 +407,43 @@ const App = () => {
     const member = members.find(m => m.username === loginForm.username && m.pass === loginForm.pass);
 
     if (member) {
-       // Check Date Validity
-       const now = new Date();
-       const start = new Date(member.startDate);
-       const end = new Date(member.endDate);
-       
-       if (now >= start && now <= end) {
-         setUser({ isLoggedIn: true, username: member.username, isAdmin: false });
-         setShowLogin(false);
-       } else {
-         setLoginError('账号不在有效期内');
-       }
+       validateAndLogin(member);
     } else {
       setLoginError('用户名或密码错误');
     }
+  };
+
+  const handleWeChatLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+
+    if (!wechatName.trim()) {
+      setLoginError('请输入微信昵称');
+      return;
+    }
+
+    const members = DataManager.parseMembers(DataManager.getMembersMD());
+    // Find member with matching username AND empty password
+    const member = members.find(m => m.username === wechatName.trim() && m.pass === '');
+
+    if (member) {
+      validateAndLogin(member);
+    } else {
+      setLoginError('未找到该微信会员，请联系管理员添加');
+    }
+  };
+
+  const validateAndLogin = (member: Member) => {
+     const now = new Date();
+     const start = new Date(member.startDate);
+     const end = new Date(member.endDate);
+     
+     if (now >= start && now <= end) {
+       setUser({ isLoggedIn: true, username: member.username, isAdmin: false });
+       setShowLogin(false);
+     } else {
+       setLoginError('账号不在有效期内');
+     }
   };
 
   const handleLogout = () => {
@@ -329,6 +453,13 @@ const App = () => {
 
   const handleLinkClick = async (url: string) => {
     if (user.isLoggedIn) {
+      // Record access log for member too (optional, but good for tracking)
+      // If we only want to track Guest usage limits, we don't increment counter.
+      // But prompt said "WeChat name as username login recorded in logs".
+      // We will record the click event with the username.
+      if (clientInfo.ip) {
+         DataManager.appendLog(user.username, clientInfo.ip, clientInfo.location, 0); // 0 indicates member/unlimited
+      }
       window.open(url, '_blank');
       return;
     }
@@ -339,7 +470,8 @@ const App = () => {
     }
 
     const currentCount = DataManager.incrementGuestUsage(clientInfo.ip);
-    DataManager.appendLog(clientInfo.ip, clientInfo.location, currentCount);
+    // Log as Guest
+    DataManager.appendLog('Guest', clientInfo.ip, clientInfo.location, currentCount);
 
     if (currentCount > 5) {
       setBlockModal(true);
@@ -358,13 +490,11 @@ const App = () => {
             <div className="flex items-center gap-3">
               {/* Logo Area */}
               <div className="relative group cursor-pointer overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                {/* Fallback visual if image fails or before load, though img tag is primary */}
                 <img 
                   src="./logo.png" 
                   alt="产品老高 PM LAOGAO" 
                   className="h-10 sm:h-12 w-auto object-contain"
                   onError={(e) => {
-                    // Fallback to text representation if logo.png is missing
                     e.currentTarget.style.display = 'none';
                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
                   }}
@@ -380,7 +510,7 @@ const App = () => {
                  <div className="flex items-center gap-2 sm:gap-4 bg-stone-100/50 p-1.5 rounded-full pl-4 border border-stone-200">
                    <div className="text-stone-700 flex items-center gap-2">
                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                     <span className="font-semibold text-sm">{user.username}</span>
+                     <span className="font-semibold text-sm max-w-[100px] truncate">{user.username}</span>
                    </div>
                    {user.isAdmin && (
                      <button 
@@ -415,7 +545,7 @@ const App = () => {
 
       {/* Main Content */}
       <main className="flex-grow relative pt-24 pb-12 overflow-hidden">
-        {/* Decorative Background Elements (Updated to Brand Colors) */}
+        {/* Decorative Background Elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-5%] right-[-5%] w-[500px] h-[500px] bg-amber-200/40 rounded-full mix-blend-multiply filter blur-[80px] opacity-60 animate-blob"></div>
           <div className="absolute top-[10%] left-[-10%] w-[400px] h-[400px] bg-orange-200/40 rounded-full mix-blend-multiply filter blur-[80px] opacity-60 animate-blob animation-delay-2000"></div>
@@ -469,7 +599,7 @@ const App = () => {
               </div>
             </div>
 
-            {/* Card 3 (Coming Soon) */}
+            {/* Card 3 */}
             <div className="bg-stone-50 rounded-2xl p-8 border border-stone-200 relative overflow-hidden flex flex-col justify-between select-none">
               <div>
                 <div className="w-14 h-14 bg-stone-200 rounded-2xl flex items-center justify-center mb-6">
@@ -496,54 +626,112 @@ const App = () => {
       </footer>
 
       {/* Login Modal */}
-      <Modal isOpen={showLogin} onClose={() => setShowLogin(false)} title="用户登录">
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-stone-700 mb-1.5">账号</label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
-              </div>
-              <input 
-                type="text" 
-                className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
-                placeholder="请输入用户名"
-                value={loginForm.username}
-                onChange={e => setLoginForm({...loginForm, username: e.target.value})}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-stone-700 mb-1.5">密码</label>
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
-              </div>
-              <input 
-                type="password" 
-                className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
-                placeholder="请输入密码"
-                value={loginForm.pass}
-                onChange={e => setLoginForm({...loginForm, pass: e.target.value})}
-              />
-            </div>
-          </div>
-          
-          {loginError && (
-            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-sm p-3 rounded-lg flex items-center gap-2 animate-pulse">
-              <AlertCircle size={16} /> {loginError}
-            </div>
-          )}
+      <Modal isOpen={showLogin} onClose={() => setShowLogin(false)} title={loginMode === 'password' ? "用户登录" : "微信扫码登录"}>
+        {/* Toggle Buttons */}
+        <div className="flex bg-stone-100 p-1 rounded-lg mb-6">
+          <button 
+            onClick={() => setLoginMode('password')}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${loginMode === 'password' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+          >
+            账号密码
+          </button>
+          <button 
+            onClick={() => setLoginMode('wechat')}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-1 ${loginMode === 'wechat' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+          >
+            <ScanLine size={14} className={loginMode === 'wechat' ? "text-emerald-500" : ""} /> 扫码登录
+          </button>
+        </div>
 
-          <div className="pt-2">
-            <button 
-              type="submit" 
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-900 transition-all transform active:scale-[0.98]"
-            >
-              立即登录
-            </button>
-          </div>
-        </form>
+        {loginMode === 'password' ? (
+          <form onSubmit={handlePasswordLogin} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-stone-700 mb-1.5">账号</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
+                </div>
+                <input 
+                  type="text" 
+                  className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
+                  placeholder="请输入用户名"
+                  value={loginForm.username}
+                  onChange={e => setLoginForm({...loginForm, username: e.target.value})}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-stone-700 mb-1.5">密码</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock size={18} className="text-stone-400 group-focus-within:text-amber-500 transition-colors" />
+                </div>
+                <input 
+                  type="password" 
+                  className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:bg-white transition-all outline-none"
+                  placeholder="请输入密码"
+                  value={loginForm.pass}
+                  onChange={e => setLoginForm({...loginForm, pass: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            {loginError && (
+              <div className="bg-rose-50 border border-rose-100 text-rose-600 text-sm p-3 rounded-lg flex items-center gap-2 animate-pulse">
+                <AlertCircle size={16} /> {loginError}
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-gradient-to-r from-stone-800 to-stone-900 hover:from-stone-700 hover:to-stone-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-900 transition-all transform active:scale-[0.98]"
+              >
+                立即登录
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleWeChatLogin} className="space-y-6">
+             <div className="text-center space-y-3">
+                <QRCodeGenerator />
+                <p className="text-stone-500 text-sm px-4">
+                  请扫描二维码添加管理员好友<br/>
+                  <span className="text-xs text-stone-400">添加成功后，请输入您的<span className="text-emerald-600 font-bold">微信昵称</span>进行验证</span>
+                </p>
+             </div>
+
+             <div>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MessageCircle size={18} className="text-stone-400 group-focus-within:text-emerald-500 transition-colors" />
+                  </div>
+                  <input 
+                    type="text" 
+                    className="block w-full pl-10 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none text-center"
+                    placeholder="请输入已添加的微信昵称"
+                    value={wechatName}
+                    onChange={e => setWechatName(e.target.value)}
+                  />
+                </div>
+             </div>
+
+             {loginError && (
+              <div className="bg-rose-50 border border-rose-100 text-rose-600 text-sm p-3 rounded-lg flex items-center gap-2 animate-pulse justify-center">
+                <AlertCircle size={16} /> {loginError}
+              </div>
+            )}
+
+             <div className="pt-2">
+              <button 
+                type="submit" 
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all transform active:scale-[0.98]"
+              >
+                我已扫码，验证登录
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Admin Dashboard Modal */}
