@@ -3,27 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>产品老高</title>
+  <title>产品老高 - AI 产品经理学习站</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f8fafc;
-    }
-  </style>
-<script type="importmap">
+  <script>
+    // Polyfill process for libraries that expect it
+    window.process = {
+      env: {
+        NODE_ENV: 'production',
+        API_KEY: '' 
+      }
+    };
+  </script>
+  <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "react": "https://esm.sh/react@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "react-qr-code": "https://esm.sh/react-qr-code@2.0.15",
+    "@google/genai": "https://esm.sh/@google/genai@1.38.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
   }
 }
 </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #fafaf9;
+      margin: 0;
+      padding: 0;
+      color: #1c1917;
+    }
+    * { -webkit-tap-highlight-color: transparent; }
+    .glass {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .grid-bg {
+      background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
 </head>
-<body>
+<body class="grid-bg">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
