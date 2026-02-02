@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>产品老高 - AI 产品经理学习站</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入微信官方网页登录 SDK -->
+  <script src="https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js"></script>
   <script>
-    // Polyfill process for libraries that expect it
     window.process = {
       env: {
         NODE_ENV: 'production',
@@ -23,7 +24,7 @@
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
     "lucide-react": "https://esm.sh/lucide-react@0.460.0?deps=react@18.3.1",
     "react-qr-code": "https://esm.sh/react-qr-code@2.0.15?deps=react@18.3.1",
-    "@google/genai": "https://esm.sh/@google/genai@1.38.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
   }
 }
@@ -46,6 +47,12 @@
     .grid-bg {
       background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
       background-size: 20px 20px;
+    }
+    /* 微信二维码容器样式微调 */
+    #wechat_login_container iframe {
+      border: none;
+      width: 300px;
+      height: 400px;
     }
   </style>
 </head>

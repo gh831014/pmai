@@ -2,6 +2,6 @@
   "requestFramePermissions": [
     "geolocation"
   ],
-  "name": "pmlaogao",
-  "description": "产品老高 AI 工具展示界面"
+  "name": "pmlaogao-v2",
+  "description": "产品老高 AI 工具展示界面 - 服务端持久化增强版"
 }
